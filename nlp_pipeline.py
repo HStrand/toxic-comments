@@ -53,6 +53,7 @@ class NlpPipeline():
         self.cv_scores = {}
         for model in self.models:
             self.cv_scores[model.name] = -1
+        self.scaler = StandardScaler()
 
     def run(self):        
         self.apply_transforms()
@@ -66,7 +67,7 @@ class NlpPipeline():
         if self.verbosity > 0:
             print(s)
 
-    def engineer_features(self, use_transform=True):
+    def engineer_features(self, use_transform=True, normalize=False):
         self.log("Engineering features")
         train_feats = []
         test_feats = []
@@ -79,17 +80,34 @@ class NlpPipeline():
             
         for func in self.feature_functions:
             train_feature = np.array(func(train_data))
-            if len(train_feature.shape) == 1:
-                train_feature = train_feature.reshape(-1,1)
             train_feats.append(train_feature)
             test_feature = np.array(func(test_data))
-            if len(test_feature.shape) == 1:
-                test_feature = test_feature.reshape(-1,1)
-            test_feats.append(test_feature)         
-                
+            test_feats.append(test_feature)
+
         self.train_features = np.hstack((feature for feature in train_feats))
         self.test_features = np.hstack((feature for feature in test_feats))
         
+    def add_feature(self, func, use_transform=False, normalize=True):
+        self.log("Adding feature")
+        if use_transform:
+            train_data = self.train_transformed
+            test_data = self.test_transformed
+        else:
+            train_data = self.train[input_column]
+            test_data = self.test[input_column]
+        
+        train_feature = np.array(func(train_data))
+        test_feature = np.array(func(test_data))
+        if normalize:
+            train_feature = self.normalize(train_feature)
+            test_feature = self.normalize(test_feature)
+        
+        self.train_features = np.hstack((self.train_features, np.array(train_feature)))
+        self.test_features = np.hstack((self.test_features, np.array(test_feature)))
+        
+    def normalize(self, data):
+        self.scaler.fit(data)
+        return self.scaler.transform(data)
     
     def apply_transforms(self):
         self.train_transformed = self.train[input_column]
@@ -169,7 +187,7 @@ class NlpPipeline():
             df = pd.read_csv(filename)
             metadata.to_csv(filename, mode='a', header=False, index=False)
         except:            
-            metadata.to_csv(filename, mode='a', index=False)    
+            metadata.to_csv(filename, mode='a', index=False)
 
 
 
