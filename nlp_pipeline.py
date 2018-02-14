@@ -148,6 +148,7 @@ class NlpPipeline():
             if past_submissions is not None:
                 submission_num = max(past_submissions) + 1
             filename = 'submissions\\submission' + str(submission_num) + '.csv'
+            submission.to_csv(filename, index=False)
             self.store_submission_metadata(filename, submission_num, model)
 
     def get_past_submissions(self):
