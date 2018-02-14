@@ -10,32 +10,11 @@ from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 
 """
-Feature engineering
+Pretrained model
 """
-def get_average_word2vec(tokens_list, vector, generate_missing=False, k=300):
-    if len(tokens_list)<1:
-        return np.zeros(k)
-    if generate_missing:
-        vectorized = [vector[word] if word in vector else np.random.rand(k) for word in tokens_list]
-    else:
-        vectorized = [vector[word] if word in vector else np.zeros(k) for word in tokens_list]
-    length = len(vectorized)
-    summed = np.sum(vectorized, axis=0)
-    averaged = np.divide(summed, length)
-    return averaged
-
-def get_word2vec_embeddings(vectors, clean_comments, generate_missing=False):
-    embeddings = clean_comments.apply(lambda x: get_average_word2vec(x, vectors, generate_missing=generate_missing))
-    return list(embeddings)
-
+N_DIMS = 300
 # pretrained = "data\\GoogleNews-vectors-negative300.bin.gz"
-
-def w2v(series):
-    word_vectors = gensim.models.KeyedVectors.load_word2vec_format(pretrained, binary=True)        
-    return get_word2vec_embeddings(word_vectors, series)
-
-N_DIMS = 100
-pretrained = 'data\\glove.6B.100d.txt'
+pretrained = 'data\\glove.840B.300d.txt'
 
 def get_average_wordvector(tokens_list, vector, generate_missing=False, k=N_DIMS):
     if len(tokens_list)<1:
@@ -53,9 +32,6 @@ def get_embeddings(vectors, clean_comments, generate_missing=False):
     embeddings = clean_comments.apply(lambda x: get_average_wordvector(x, vectors, generate_missing=generate_missing))
     return list(embeddings)
 
-def embed(series):
-    return get_embeddings(glove, series)
-
 def get_coefs(row):
     row = row.strip().split()
     # can't use row[0], row[1:] split because 840B contains multi-part words 
@@ -65,6 +41,9 @@ def get_coefs(row):
 def get_glove():
     return dict(get_coefs(row) for row in open(pretrained, encoding="utf-8"))
 
+"""
+Feature engineering
+"""
 def lengths(series):
     return np.array(series.apply(len)).reshape(-1,1).astype(float)
 
@@ -88,7 +67,7 @@ Pipeline class
 """
 class NlpPipeline():
 
-    def __init__(self, train=None, test=None, input_column='text_comment', class_labels=None, feature_functions=None, transforms=None, models=None, metric='roc_auc', id_column='id', verbosity=1):
+    def __init__(self, train=None, test=None, input_column='text_comment', class_labels=None, feature_functions=None, transforms=None, models=None, metric='roc_auc', word_vectors=None, id_column='id', verbosity=1):
         self.train = train
         self.test = test
         self.input_column = input_column
@@ -107,6 +86,7 @@ class NlpPipeline():
         self.scaler = StandardScaler()
         self.train_transformed = train[input_column]
         self.test_transformed = test[input_column]
+        self.word_vectors = word_vectors
 
     def run(self):        
         self.engineer_features()
@@ -119,10 +99,16 @@ class NlpPipeline():
 
     def create_embeddings(self, func):
         self.log("Creating embeddings")
-        embeddings = func(pd.concat([self.train_transformed, self.test_transformed]))
-        
-        self.train_features = np.hstack((self.train_features, np.array(embeddings[:len(self.train[self.input_column])])))
-        self.test_features = np.hstack((self.test_features, np.array(embeddings[len(self.train[self.input_column]):])))
+        embeddings = get_embeddings(self.word_vectors, self.train_transformed.append(self.test_transformed))
+
+        if self.train_features.size == 0:
+            self.train_features = np.array(embeddings[:len(self.train[self.input_column])])
+        else:
+            self.train_features = np.hstack((self.train_features, np.array(embeddings[:len(self.train[self.input_column])])))
+        if self.test_features.size == 0:
+            self.test_features = np.array(embeddings[len(self.test[self.input_column]):])
+        else:
+            self.test_features = np.hstack((self.test_features, np.array(embeddings[len(self.train[self.input_column]):])))
 
     def engineer_features(self, use_transform=False, normalize=True):
         self.log("Engineering features")
@@ -208,7 +194,7 @@ class NlpPipeline():
             self.predictions[model.name] = {}
             for label in self.class_labels:
                 self.log("Fitting submission classifier for " + label)
-                y_train = np.array(train[label])
+                y_train = np.array(self.train[label])
                 model.fit(self.train_features, y_train)
                 self.predictions[model.name][label] = model.predict_proba(self.test_features)
 
@@ -222,12 +208,12 @@ class NlpPipeline():
             submission_num = 1
             past_submissions = self.get_past_submissions()
             if past_submissions is not None and past_submissions != []:
-                submission_num = max(past_submissions) + 1
+                submission_num = max(past_submissions)[0] + 1
             filename = 'submissions\\submission' + str(submission_num) + '.csv'
             submission.to_csv(filename, index=False)
             self.store_submission_metadata(filename, submission_num, model)
 
-    def get_past_submissions():
+    def get_past_submissions(self):
         current_dir = os.getcwd()
         path = os.path.join(current_dir, 'submissions')
         try:
@@ -311,8 +297,12 @@ if __name__ == "__main__":
     train["comment_text"] = train["comment_text"].fillna("_na_")
     test["comment_text"] = test["comment_text"].fillna("_na_")
 
+
     print("Getting GloVe")
     glove = get_glove()
+
+    # print("Getting google news model")
+    # w2v = gensim.models.KeyedVectors.load_word2vec_format(pretrained, binary=True)   
 
     # Pipeline inputs
     class_labels = [column for column in train.columns[2:8]]
@@ -322,5 +312,5 @@ if __name__ == "__main__":
     logreg.name = "Logistic regression newton"
     models = [logreg]
 
-    pipe = NlpPipeline(train, test, "comment_text", class_labels, feature_funcs, transforms, models)
+    pipe = NlpPipeline(train, test, "comment_text", class_labels, feature_funcs, transforms, models, word_vectors=glove)
     pipe.run()
