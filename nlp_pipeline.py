@@ -39,6 +39,9 @@ def lengths(series):
 def asterixes(series):
     return np.array(series.apply(lambda x: x.count('!'))).reshape(-1,1).astype(float)
 
+def uppercase_count(series):
+    return np.array(series.apply(lambda x: len(re.findall(r'[A-Z]',x)))).reshape(-1,1).astype(float)
+
 re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
 
 """
@@ -156,7 +159,7 @@ class NlpPipeline():
             for label in self.class_labels:
                 self.log("Cross-validating " + label)
                 scores = cross_val_score(model, self.train_features, list(train[label]), scoring=self.metric, cv=5)
-                self.log(self.metric + str(np.mean(scores)))
+                self.log(self.metric + ": " + str(np.mean(scores)))
                 scorelist.append(np.mean(scores))
             self.cv_scores[model.name] = np.mean(scorelist)
 
@@ -186,11 +189,11 @@ class NlpPipeline():
             submission.to_csv(filename, index=False)
             self.store_submission_metadata(filename, submission_num, model)
 
-    def get_past_submissions(self):
+    def get_past_submissions():
         current_dir = os.getcwd()
         path = os.path.join(current_dir, 'submissions')
         try:
-            return [int(s[s.find('.csv')-1]) for s in os.listdir(path) if s.find('.csv') > -1 and s.find('submission') > -1]
+            return [[int(s) for s in re.findall(r'\d+', f)] for f in os.listdir(path)]
         except:
             return None
 
@@ -481,7 +484,7 @@ if __name__ == "__main__":
     # Pipeline inputs
     input_column = 'comment_text'
     class_labels = [column for column in train.columns[2:8]]
-    feature_funcs = [w2v]
+    feature_funcs = [w2v, lengths, uppercase_count]
     transforms = [tokenize]
     logreg = LogisticRegression(C=30.0, class_weight='balanced', solver='newton-cg')
     logreg.name = "Logistic regression newton"
