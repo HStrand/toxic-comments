@@ -45,8 +45,11 @@ def get_pretrained(text_file):
 Feature engineering
 """
 
-def asterixes(x):
+def asterix_freq(x):
     return x.count('!')/len(x)
+
+def question_freq(x):
+    return x.count('?')/len(x)    
 
 def uppercase_freq(x):
     return len(re.findall(r'[A-Z]',x))/len(x)
@@ -334,7 +337,7 @@ if __name__ == "__main__":
 
     # Pipeline inputs
     class_labels = [column for column in train.columns[2:8]]
-    feature_funcs = [len, asterixes, uppercase_freq, line_change_freq, rep_freq]
+    feature_funcs = [len, asterix_freq, uppercase_freq, line_change_freq, rep_freq, question_freq]
     transforms = [tokenize]
     logreg = LogisticRegression(C=30.0, class_weight='balanced', solver='newton-cg')
     logreg.name = "Logistic regression newton"
