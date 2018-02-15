@@ -251,8 +251,8 @@ class NlpPipeline():
             feature_funcs += str(func).split(' ')[1] + " "
         for trf in self.transforms:
             transforms += str(trf).split(' ')[1] + " "   
-        cols = ["submission", "filename", "model", "feature_funcs", "transforms", "cv_score"]
-        metadata = pd.DataFrame([[submission_num, filename, self.model_info(model), feature_funcs, transforms, self.cv_scores[model.name]]], columns=cols)
+        cols = ["submission", "filename", "model", "pretrained", "feature_funcs", "transforms", "cv_score"]
+        metadata = pd.DataFrame([[submission_num, filename, self.model_info(model), pretrained, feature_funcs, transforms, self.cv_scores[model.name]]], columns=cols)
         filename = 'submissions\\submeta.csv'
         try:
             df = pd.read_csv(filename)
