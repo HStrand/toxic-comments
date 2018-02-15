@@ -76,7 +76,7 @@ Pipeline class
 """
 class NlpPipeline():
 
-    def __init__(self, train=None, test=None, input_column='text_comment', class_labels=None, feature_functions=None, transforms=None, models=None, metric='roc_auc', word_vectors=None, id_column='id', verbosity=1):
+    def __init__(self, train=None, test=None, input_column='text_comment', class_labels=None, feature_functions=None, transforms=None, models=None, metric='roc_auc', word_vectors=None, pretrained=None, id_column='id', verbosity=1):
         self.train = train
         self.test = test
         self.input_column = input_column
@@ -152,8 +152,8 @@ class NlpPipeline():
             train_data = self.train_transformed
             test_data = self.test_transformed
         else:
-            train_data = self.train[input_column]
-            test_data = self.test[input_column]
+            train_data = self.train[self.input_column]
+            test_data = self.test[self.input_column]
         
         train_feature = format_feature(train_data, func)
         test_feature = format_feature(test_data, func)
@@ -322,8 +322,8 @@ if __name__ == "__main__":
     test = pd.read_csv('data\\test.csv').fillna(' ')
 
     # pretrained = "data\\GoogleNews-vectors-negative300.bin.gz"
-    # pretrained = 'data\\glove.840B.300d.txt'
-    pretrained = 'data\\glove.6B.300d.txt'
+    pretrained = 'data\\glove.840B.300d.txt'
+    # pretrained = 'data\\glove.6B.300d.txt'
     # pretrained = "data\\crawl-300d-2M.vec"
 
     # print("Getting google news model")
@@ -343,6 +343,6 @@ if __name__ == "__main__":
     logreg.name = "Logistic regression newton"
     models = [logreg]
 
-    pipe = NlpPipeline(train, test, "comment_text", class_labels, feature_funcs, transforms, models, word_vectors=vector_model)
+    pipe = NlpPipeline(train, test, "comment_text", class_labels, feature_funcs, transforms, models, word_vectors=vector_model, pretrained=pretrained)
     print(pipe)
     pipe.run()

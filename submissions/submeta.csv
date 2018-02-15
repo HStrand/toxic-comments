@@ -1,0 +1,22 @@
+submission,filename,model,pretrained,feature_funcs,transforms,cv_score
+1,submissions\submission1.csv,Logistic regression C=30 balanced newton-cg,w2v, lengths ,tokenize ,-1
+2,submissions\submission2.csv,Logistic regression C=1,w2v, lengths ,tokenize ,-1
+3,submissions\submission3.csv,Logistic regression C=30 balanced newton-cg,w2v, lengths ,tokenize ,0.9664220538548575
+4,submissions\submission4.csv,Logistic regression C=1,w2v, lengths ,tokenize ,0.9645013505677117
+9,submissions\submission9.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, lengths ,tokenize ,0.9664220538548575
+10,submissions\submission10.csv,Logistic regression linear: 1.0 None False True 1 100 ovr 1 l2 None liblinear 0.0001 0 False,w2v, lengths ,tokenize ,0.9645013505677117
+11,submissions\submission10.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, ,tokenize ,0.965799681157162
+12,submissions\submission10.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, lengths asterixes ,tokenize ,0.9666973409449046
+13,submissions\submission11.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, lengths asterixes uppercase_count ,tokenize ,0.96688586590880037
+7,submissions\submission7.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, ,tokenize ,0.9708159703767193
+8,submissions\submission8.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, ,tokenize ,0.9708159703767193
+9,submissions\submission9.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,glove, ,tokenize ,0.9708159703767193
+10,submissions\submission10.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, lengths asterixes uppercase_count ,tokenize ,0.7086307321281891
+11,submissions\submission11.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, lengths asterixes uppercase_count ,tokenize ,0.7086307321281891
+12,submissions\submission12.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,w2v, lengths asterixes uppercase_count ,tokenize ,0.7086307321281891
+13,submissions\submission13.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,glove, lengths asterixes uppercase_count ,tokenize ,0.971778229179313
+14,submissions\submission14.csv,XGBoost: 0.5 1 1 0 0.25 0 3 1 None 20 -1 binary:logistic 0 1 1 0 True 1,glove, lengths asterixes uppercase_count ,tokenize ,0.9510070903438098
+15,submissions\submission15.csv,XGBoost: n_estimators=300 max_depth=5 learning_rate=0.15 colsample_bytree=0.6,glove, lengths asterixes uppercase_count ,tokenize ,0.976536049868579
+16,submissions\submission16.csv,XGBoost: 0.5 1 0.6 0 0.15 0 5 1 None 300 -1 binary:logistic 0 1 1 0 True 1,glove,lengths asterixes uppercase_count ,tokenize ,0.976536049868579
+17,submissions\submission17.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,glove,function asterix_freq uppercase_freq line_change_freq rep_freq question_freq ,tokenize ,0.9405107229566619
+18,submissions\submission18.csv,Logistic regression newton: 30.0 balanced False True 1 100 ovr 1 l2 None newton-cg 0.0001 0 False,glove,function asterix_freq uppercase_freq line_change_freq rep_freq question_freq avg_word_length ,tokenize ,0.9403228954846684
