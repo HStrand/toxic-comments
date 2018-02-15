@@ -3,6 +3,8 @@ import numpy as np
 import os
 import re
 import string
+import warnings
+warnings.filterwarnings(action='ignore', category=UserWarning, module='gensim')
 import gensim
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.linear_model import LogisticRegression
@@ -13,8 +15,6 @@ from sklearn.preprocessing import StandardScaler
 Pretrained model
 """
 N_DIMS = 300
-# pretrained = "data\\GoogleNews-vectors-negative300.bin.gz"
-pretrained = 'data\\glove.840B.300d.txt'
 
 def get_average_wordvector(tokens_list, vector, generate_missing=False, k=N_DIMS):
     if len(tokens_list)<1:
@@ -38,26 +38,35 @@ def get_coefs(row):
     word, arr = " ".join(row[:-N_DIMS]), row[-N_DIMS:]
     return word, np.asarray(arr, dtype='float32')
 
-def get_glove():
-    return dict(get_coefs(row) for row in open(pretrained, encoding="utf-8"))
+def get_pretrained(text_file):
+    return dict(get_coefs(row) for row in open(text_file, encoding="utf-8"))
 
 """
 Feature engineering
 """
-def lengths(series):
-    return np.array(series.apply(len)).reshape(-1,1).astype(float)
 
-def asterixes(series):
-    return np.array(series.apply(lambda x: x.count('!'))).reshape(-1,1).astype(float)
+def asterix_freq(x):
+    return x.count('!')/len(x)
 
-def uppercase_count(series):
-    return np.array(series.apply(lambda x: len(re.findall(r'[A-Z]',x)))).reshape(-1,1).astype(float)
+def question_freq(x):
+    return x.count('?')/len(x)    
 
-re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
+def uppercase_freq(x):
+    return len(re.findall(r'[A-Z]',x))/len(x)
+
+def line_change_freq(x):
+    return x.count("\n")/len(x)
+
+def rep_freq(x):
+    return np.sum([x[i]==x[i+1]==x[i+2] for i in range(0,len(x)-2)])/len(x) 
+
+def format_feature(series, func):
+    return np.array(series.apply(func)).reshape(-1,1).astype(float)
 
 """
 Transforms
 """
+re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
 
 def tokenize(row):
     return re_tok.sub(r' \1 ', row).lower().split()
@@ -91,13 +100,16 @@ class NlpPipeline():
     def run(self):        
         self.engineer_features()
         self.apply_transforms()
-        self.create_embeddings(embed)
+        self.create_embeddings()
+        self.cross_val()
+        self.fit_predict()
+        self.create_submission()
 
     def log(self, s):
         if self.verbosity > 0:
             print(s)
 
-    def create_embeddings(self, func):
+    def create_embeddings(self):
         self.log("Creating embeddings")
         embeddings = get_embeddings(self.word_vectors, self.train_transformed.append(self.test_transformed))
 
@@ -122,9 +134,12 @@ class NlpPipeline():
             test_data = self.test[self.input_column]
             
         for func in self.feature_functions:
-            train_feature = np.array(func(train_data))
+            train_feature = format_feature(train_data, func)
+            test_feature = format_feature(test_data, func)
+            if normalize:
+                train_feature = self.normalize(train_feature)
+                test_feature = self.normalize(test_feature)
             train_feats.append(train_feature)
-            test_feature = np.array(func(test_data))
             test_feats.append(test_feature)
 
         self.train_features = np.hstack((feature for feature in train_feats))
@@ -140,14 +155,22 @@ class NlpPipeline():
             train_data = self.train[input_column]
             test_data = self.test[input_column]
         
-        train_feature = np.array(func(train_data))
-        test_feature = np.array(func(test_data))
+        train_feature = format_feature(train_data, func)
+        test_feature = format_feature(test_data, func)
         if normalize:
             train_feature = self.normalize(train_feature)
             test_feature = self.normalize(test_feature)
         
-        self.train_features = np.hstack((self.train_features, np.array(train_feature)))
-        self.test_features = np.hstack((self.test_features, np.array(test_feature)))
+        self.train_features = np.hstack((self.train_features, train_feature))
+        self.test_features = np.hstack((self.test_features, test_feature))
+
+    def add_feature_data(self, train_feature, test_feature, normalize=False):
+        if normalize:
+            train_feature = self.normalize(train_feature)
+            test_feature = self.normalize(test_feature)
+        self.train_features = np.hstack((self.train_features, train_feature))
+        self.test_features = np.hstack((self.test_features, test_feature))
+
         
     def normalize(self, data):
         self.scaler.fit(data)
@@ -290,27 +313,36 @@ class NlpPipeline():
         
         return s
 
+"""
+Main
+"""
 if __name__ == "__main__":
     
-    train = pd.read_csv('data\\train.csv')
-    test = pd.read_csv('data\\test.csv')
-    train["comment_text"] = train["comment_text"].fillna("_na_")
-    test["comment_text"] = test["comment_text"].fillna("_na_")
+    train = pd.read_csv('data\\train.csv').fillna(' ')
+    test = pd.read_csv('data\\test.csv').fillna(' ')
 
+    # pretrained = "data\\GoogleNews-vectors-negative300.bin.gz"
+    # pretrained = 'data\\glove.840B.300d.txt'
+    pretrained = 'data\\glove.6B.300d.txt'
+    # pretrained = "data\\crawl-300d-2M.vec"
 
-    print("Getting GloVe")
-    glove = get_glove()
+    # print("Getting google news model")
+    # w2v = gensim.models.KeyedVectors.load_word2vec_format(pretrained, binary=True)   
+
+    print("Getting pretrained model from", pretrained)
+    vector_model = get_pretrained(pretrained)
 
     # print("Getting google news model")
     # w2v = gensim.models.KeyedVectors.load_word2vec_format(pretrained, binary=True)   
 
     # Pipeline inputs
     class_labels = [column for column in train.columns[2:8]]
-    feature_funcs = [lengths, asterixes, uppercase_count]
+    feature_funcs = [len, asterix_freq, uppercase_freq, line_change_freq, rep_freq, question_freq]
     transforms = [tokenize]
     logreg = LogisticRegression(C=30.0, class_weight='balanced', solver='newton-cg')
     logreg.name = "Logistic regression newton"
     models = [logreg]
 
-    pipe = NlpPipeline(train, test, "comment_text", class_labels, feature_funcs, transforms, models, word_vectors=glove)
+    pipe = NlpPipeline(train, test, "comment_text", class_labels, feature_funcs, transforms, models, word_vectors=vector_model)
+    print(pipe)
     pipe.run()
