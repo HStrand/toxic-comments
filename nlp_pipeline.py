@@ -313,6 +313,9 @@ if __name__ == "__main__":
     glove = get_pretrained(pretrained)
 
 
+    # print("Getting google news model")
+    # w2v = gensim.models.KeyedVectors.load_word2vec_format(pretrained, binary=True)   
+
     # Pipeline inputs
     class_labels = [column for column in train.columns[2:8]]
     feature_funcs = [lengths, asterixes, uppercase_count]
