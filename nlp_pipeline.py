@@ -247,10 +247,11 @@ class NlpPipeline():
                     model.fit(X_train, y_train)
                     y_pred = model.predict_proba(X_holdout)[:,1]
                     self.oof_preds[label][test_idx] = y_pred
-                    self.log("AUC: " + str(roc_auc_score(y_holdout, y_pred)))
-                    scorelist.append(np.mean(scores))
+                    auc = roc_auc_score(y_holdout, y_pred)
+                    self.log("AUC: " + str(auc))
+                    scorelist.append(auc)
             self.cv_scores[model.name] = np.mean(scorelist)
-            self.log("CV score: " + self.cv_scores[model.name])
+            self.log("CV score: " + str(self.cv_scores[model.name]))
 
         self.fit_predict() # Finally, fit on entire training set and predict
 
