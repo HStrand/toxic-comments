@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import KFold
 
 """
 Pretrained model
@@ -96,13 +97,14 @@ class NlpPipeline():
         self.train_transformed = train[input_column]
         self.test_transformed = test[input_column]
         self.word_vectors = word_vectors
+        self.pretrained = pretrained
+        self.oof_preds = {}
 
     def run(self):        
         self.engineer_features()
         self.apply_transforms()
         self.create_embeddings()
-        self.cross_val()
-        self.fit_predict()
+        self.fit_predict_oof()
         self.create_submission()
 
     def log(self, s):
@@ -221,6 +223,37 @@ class NlpPipeline():
                 model.fit(self.train_features, y_train)
                 self.predictions[model.name][label] = model.predict_proba(self.test_features)
 
+    """
+    Fit each model on 4 folds and predict the 5th fold.
+    These predictions are stored in self.oof_preds and saved to be used to fit stackers.
+    Finally, fit on the entire data set and predict on test set.
+    These predictions are stored in self.predictions and saved to be used as test inputs for stackers.
+    """
+    def fit_predict_oof(self):
+        self.log("Creating out-of-fold meta training set for stacker")
+        folds = KFold(n_splits=5, shuffle=True, random_state=42)
+        self.oof_preds = {}
+        for model in self.models:
+            scorelist = []
+            self.log(str(model))
+            for label in self.class_labels:
+                self.log(label)
+                self.oof_preds[label] = np.zeros((self.train_features.shape[0]))
+                for train_idx, test_idx in folds.split(self.train_features):
+                    X_train = self.train_features[train_idx]
+                    y_train = self.train[label][train_idx]
+                    X_holdout = self.train_features[test_idx]
+                    y_holdout = self.train[label][test_idx]
+                    model.fit(X_train, y_train)
+                    y_pred = model.predict_proba(X_holdout)[:,1]
+                    self.oof_preds[label][test_idx] = y_pred
+                    self.log("AUC: " + str(roc_auc_score(y_holdout, y_pred)))
+                    scorelist.append(np.mean(scores))
+            self.cv_scores[model.name] = np.mean(scorelist)
+            self.log("CV score: " + self.cv_scores[model.name])
+
+        self.fit_predict() # Finally, fit on entire training set and predict
+
     def create_submission(self):
         for model in self.models:
             self.log("Creating submissions")
@@ -234,6 +267,13 @@ class NlpPipeline():
                 submission_num = max(past_submissions)[0] + 1
             filename = 'submissions\\submission' + str(submission_num) + '.csv'
             submission.to_csv(filename, index=False)
+            
+            oof_name = "submissions\\oof_train" + str(submission_num) + ".csv"
+            oof = self.test[self.id_column].to_frame()
+            for label in self.class_labels:
+                oof[label] = self.oof_preds[model.name][label][:,1]
+            oof.to_csv(oof_name, index=False)
+            
             self.store_submission_metadata(filename, submission_num, model)
 
     def get_past_submissions(self):
@@ -252,13 +292,13 @@ class NlpPipeline():
         for trf in self.transforms:
             transforms += str(trf).split(' ')[1] + " "   
         cols = ["submission", "filename", "model", "pretrained", "feature_funcs", "transforms", "cv_score"]
-        metadata = pd.DataFrame([[submission_num, filename, self.model_info(model), pretrained, feature_funcs, transforms, self.cv_scores[model.name]]], columns=cols)
+        metadata = pd.DataFrame([[submission_num, filename, self.model_info(model), self.pretrained, feature_funcs, transforms, self.cv_scores[model.name]]], columns=cols)
         filename = 'submissions\\submeta.csv'
         try:
             df = pd.read_csv(filename)
             metadata.to_csv(filename, mode='a', header=False, index=False)
         except:            
-            metadata.to_csv(filename, mode='a', index=False)
+            metadata.to_csv(filename, mode='a', header=False, index=False)
             
     def model_info(self, model):
         s = model.name + ":"
@@ -292,8 +332,7 @@ class NlpPipeline():
         s += "Models: "
         for model in self.models:            
             s += self.model_info(model)
-            s += " | "
-            
+            s += " | "            
         s += "\n"
         s += "Transforms: "
         for transform in self.transforms:
@@ -322,9 +361,9 @@ if __name__ == "__main__":
     test = pd.read_csv('data\\test.csv').fillna(' ')
 
     # pretrained = "data\\GoogleNews-vectors-negative300.bin.gz"
-    pretrained = 'data\\glove.840B.300d.txt'
+    # pretrained = 'data\\glove.840B.300d.txt'
     # pretrained = 'data\\glove.6B.300d.txt'
-    # pretrained = "data\\crawl-300d-2M.vec"
+    pretrained = "data\\crawl-300d-2M.vec"
 
     # print("Getting google news model")
     # w2v = gensim.models.KeyedVectors.load_word2vec_format(pretrained, binary=True)   
@@ -339,7 +378,7 @@ if __name__ == "__main__":
     class_labels = [column for column in train.columns[2:8]]
     feature_funcs = [len, asterix_freq, uppercase_freq, line_change_freq, rep_freq, question_freq]
     transforms = [tokenize]
-    logreg = LogisticRegression(C=30.0, class_weight='balanced', solver='newton-cg')
+    logreg = LogisticRegression(C=0.2, class_weight='balanced', solver='newton-cg', max_iter=10)
     logreg.name = "Logistic regression newton"
     models = [logreg]
 
