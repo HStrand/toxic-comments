@@ -11,6 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
+import lightgbm as lgb
 
 """
 Pretrained model
@@ -77,7 +78,7 @@ Pipeline class
 """
 class NlpPipeline():
 
-    def __init__(self, train=None, test=None, input_column='text_comment', class_labels=None, feature_functions=None, transforms=None, models=None, metric='roc_auc', word_vectors=None, pretrained=None, id_column='id', verbosity=1):
+    def __init__(self, train=None, test=None, input_column='text_comment', class_labels=None, feature_functions=None, transforms=None, models=None, metric='roc_auc', word_index=None, pretrained=None, id_column='id', verbosity=1):
         self.train = train
         self.test = test
         self.input_column = input_column
@@ -96,7 +97,7 @@ class NlpPipeline():
         self.scaler = StandardScaler()
         self.train_transformed = train[input_column]
         self.test_transformed = test[input_column]
-        self.word_vectors = word_vectors
+        self.word_index = word_index
         self.pretrained = pretrained
         self.oof_preds = {}
 
@@ -113,7 +114,7 @@ class NlpPipeline():
 
     def create_embeddings(self):
         self.log("Creating embeddings")
-        embeddings = get_embeddings(self.word_vectors, self.train_transformed.append(self.test_transformed))
+        embeddings = get_embeddings(self.word_index, self.train_transformed.append(self.test_transformed))
 
         if self.train_features.size == 0:
             self.train_features = np.array(embeddings[:len(self.train[self.input_column])])
@@ -235,18 +236,19 @@ class NlpPipeline():
         self.oof_preds = {}
         for model in self.models:
             scorelist = []
+            self.oof_preds[model.name] = {}
             self.log(str(model))
             for label in self.class_labels:
                 self.log(label)
-                self.oof_preds[label] = np.zeros((self.train_features.shape[0]))
-                for train_idx, test_idx in folds.split(self.train_features):
+                self.oof_preds[model.name][label] = np.zeros((self.train_features.shape[0]))
+                for train_idx, pred_idx in folds.split(self.train_features):
                     X_train = self.train_features[train_idx]
                     y_train = self.train[label][train_idx]
-                    X_holdout = self.train_features[test_idx]
-                    y_holdout = self.train[label][test_idx]
+                    X_holdout = self.train_features[pred_idx]
+                    y_holdout = self.train[label][pred_idx]
                     model.fit(X_train, y_train)
                     y_pred = model.predict_proba(X_holdout)[:,1]
-                    self.oof_preds[label][test_idx] = y_pred
+                    self.oof_preds[model.name][label][pred_idx] = y_pred
                     auc = roc_auc_score(y_holdout, y_pred)
                     self.log("AUC: " + str(auc))
                     scorelist.append(auc)
@@ -255,7 +257,7 @@ class NlpPipeline():
 
         self.fit_predict() # Finally, fit on entire training set and predict
 
-    def create_submission(self):
+    def create_submission(self, oof=True):
         for model in self.models:
             self.log("Creating submissions")
             submission = self.test[self.id_column].to_frame()
@@ -269,11 +271,12 @@ class NlpPipeline():
             filename = 'submissions\\submission' + str(submission_num) + '.csv'
             submission.to_csv(filename, index=False)
             
-            oof_name = "submissions\\oof_train" + str(submission_num) + ".csv"
-            oof = self.test[self.id_column].to_frame()
-            for label in self.class_labels:
-                oof[label] = self.oof_preds[model.name][label][:,1]
-            oof.to_csv(oof_name, index=False)
+            if oof:
+                oof_name = "submissions\\oof_train" + str(submission_num) + ".csv"
+                oof = self.train[self.id_column].to_frame()
+                for label in self.class_labels:
+                    oof[label] = self.oof_preds[model.name][label]
+                oof.to_csv(oof_name, index=False)
             
             self.store_submission_metadata(filename, submission_num, model)
 
@@ -303,9 +306,12 @@ class NlpPipeline():
             
     def model_info(self, model):
         s = model.name + ":"
-        for param in model.get_params():            
-            s += " "
-            s += str(model.get_params()[param])
+        try:
+            for param in model.get_params():            
+                s += " "
+                s += str(model.get_params()[param])
+        except:
+            pass
         
         return s
     
@@ -370,7 +376,7 @@ if __name__ == "__main__":
     # w2v = gensim.models.KeyedVectors.load_word2vec_format(pretrained, binary=True)   
 
     print("Getting pretrained model from", pretrained)
-    vector_model = get_pretrained(pretrained)
+    word_index = get_pretrained(pretrained)
 
     # print("Getting google news model")
     # w2v = gensim.models.KeyedVectors.load_word2vec_format(pretrained, binary=True)   
@@ -381,8 +387,10 @@ if __name__ == "__main__":
     transforms = [tokenize]
     logreg = LogisticRegression(C=0.2, class_weight='balanced', solver='newton-cg', max_iter=10)
     logreg.name = "Logistic regression newton"
-    models = [logreg]
+    gbm = lgb.LGBMClassifier(metric="auc", num_leaves=31, boosting_type="gbdt", learning_rate=0.1, feature_fraction=0.9, bagging_fraction=0.8, bagging_freq=5, reg_lambda=0.5)
+    gbm.name = "LightGBM stacker"
+    models = [gbm]
 
-    pipe = NlpPipeline(train, test, "comment_text", class_labels, feature_funcs, transforms, models, word_vectors=vector_model, pretrained=pretrained)
+    pipe = NlpPipeline(train, test, "comment_text", class_labels, feature_funcs, transforms, models, word_index=word_index, pretrained=pretrained)
     print(pipe)
     pipe.run()
