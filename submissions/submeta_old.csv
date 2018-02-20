@@ -1,0 +1,9 @@
+submission,filename,model,feature_funcs,transforms,cv_score
+1,submissions\submission1.csv,Logistic regression C=30 balanced newton-cg,['w2v'],['tokenize'],-1
+1,submissions\submission1.csv,Logistic regression C=1,['w2v'],['tokenize'],-1
+1,submissions\submission1.csv,Logistic regression C=30 balanced newton-cg,['w2v'],['tokenize'],-1
+1,submissions\submission1.csv,Logistic regression C=1,['w2v'],['tokenize'],-1
+1,submissions\submission1.csv,Logistic regression C=30 balanced newton-cg,['w2v'],['tokenize'],-1
+1,submissions\submission1.csv,Logistic regression C=1,['w2v'],['tokenize'],-1
+5,submissions\submission5.csv,Logistic regression C=30 balanced newton-cg,['w2v'],['tokenize'],-1
+6,submissions\submission6.csv,Logistic regression C=1,['w2v'],['tokenize'],-1

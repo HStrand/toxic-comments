@@ -21,7 +21,7 @@ def get_pretrained(text_file):
     return dict(get_coefs(row) for row in open(text_file, encoding="utf-8"))
 
 def get_indices(fold):
-    folds = KFold(n_splits=5, shuffle=True, random_state=23)
+    folds = KFold(n_splits=5, shuffle=True, random_state=42)
     indices = [idx for idx in folds.split(train["id"])]
     train_idx = indices[fold][0]
     pred_idx = indices[fold][1]
@@ -32,10 +32,10 @@ class LstmNet():
     def __init__(self, embed_size, max_features, maxlen, embedding_matrix):
         inp = Input(shape=(maxlen,))
         x = Embedding(max_features, embed_size, weights=[embedding_matrix])(inp)
-        x = Bidirectional(LSTM(50, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(x)
+        x = Bidirectional(LSTM(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(x)
         # x = GlobalMaxPool1D()(x)
         x = AttentionWeightedAverage()(x)
-        x = Dense(50, activation="relu")(x)
+        x = Dense(300, activation="relu")(x)
         x = Dropout(0.1)(x)
         x = Dense(6, activation="sigmoid")(x)
         self.model = Model(inputs=inp, outputs=x)
