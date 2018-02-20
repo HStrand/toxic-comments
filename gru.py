@@ -38,35 +38,16 @@ def get_indices(fold):
 class GruNet():
     
     def __init__(self, embed_size, max_features, maxlen, embedding_matrix):
-        # inp = Input(shape=(maxlen,))
-        # x = Embedding(max_features, embed_size, weights=[embedding_matrix])(inp)
-        # x = Bidirectional(LSTM(50, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(x)
+        inp = Input(shape=(maxlen,))
+        x = Embedding(max_features, embed_size, weights=[embedding_matrix])(inp)
+        x = Bidirectional(GRU(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(x)
         # x = GlobalMaxPool1D()(x)
-        # # x = AttentionWeightedAverage()(x)
-        # x = Dense(50, activation="relu")(x)
-        # x = Dropout(0.1)(x)
-        # x = Dense(6, activation="sigmoid")(x)
-        # self.model = Model(inputs=inp, outputs=x)
-        # # optimizer = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0, amsgrad=False)
-        # self.model.compile(loss='binary_crossentropy', optimizer='Adam', metrics=['accuracy'])
-
-        self.model = Sequential()
-        self.model.add(Embedding(max_features,
-                            embed_size,
-                            weights=[embedding_matrix],
-                            input_length=maxlen,
-                            trainable=False))
-        self.model.add(SpatialDropout1D(0.3))
-        self.model.add(GRU(300, dropout=0.3, recurrent_dropout=0.3, return_sequences=True))
-        self.model.add(GRU(300, dropout=0.3, recurrent_dropout=0.3))
-
-        self.model.add(Dense(1024, activation='relu'))
-        self.model.add(Dropout(0.8))
-
-        self.model.add(Dense(1024, activation='relu'))
-        self.model.add(Dropout(0.8))
-
-        self.model.add(Dense(6, activation="sigmoid"))
+        x = AttentionWeightedAverage()(x)
+        x = Dense(300, activation="relu")(x)
+        x = Dropout(0.1)(x)
+        x = Dense(6, activation="sigmoid")(x)
+        self.model = Model(inputs=inp, outputs=x)
+        # optimizer = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0, amsgrad=False)
         self.model.compile(loss='binary_crossentropy', optimizer='Adam', metrics=['accuracy'])
     
     def fit(self, train_features, train_labels):
