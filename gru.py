@@ -29,7 +29,7 @@ def get_pretrained(text_file):
     return dict(get_coefs(row) for row in open(text_file, encoding="utf-8"))
 
 def get_indices(fold):
-    folds = KFold(n_splits=5, shuffle=True, random_state=23)
+    folds = KFold(n_splits=5, shuffle=True, random_state=42)
     indices = [idx for idx in folds.split(train["id"])]
     train_idx = indices[fold][0]
     pred_idx = indices[fold][1]
