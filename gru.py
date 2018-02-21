@@ -5,9 +5,11 @@ from keras.preprocessing.sequence import pad_sequences
 from keras import initializers, regularizers, constraints, optimizers, layers, callbacks
 from keras.models import Sequential
 from keras.layers.recurrent import LSTM, GRU
+from keras.layers import Input
 from keras.layers.core import Dense, Activation, Dropout
 from keras.layers.embeddings import Embedding
 from keras.layers.normalization import BatchNormalization
+from keras.models import Model
 from keras.utils import np_utils
 from sklearn import preprocessing, decomposition, model_selection, metrics, pipeline
 from sklearn.model_selection import GridSearchCV
@@ -17,6 +19,7 @@ from keras.preprocessing import sequence, text
 from keras.callbacks import EarlyStopping
 from sklearn.model_selection import KFold
 from sklearn.metrics import roc_auc_score
+from attlayer import AttentionWeightedAverage
 
 N_DIMS = 300
 
@@ -62,15 +65,15 @@ class GruNet():
         return self.predictions
 
     def submit(self):
-        sub = pd.read_csv('C:\\Code\\Kaggle\\toxic-comments\\data\\sample_submission.csv')
+        sub = pd.read_csv('data\\sample_submission.csv')
         sub[list_classes] = self.predictions
-        sub.to_csv('C:\\Code\\Kaggle\\toxic-comments\\submissions\\lstm8.csv', index=False)
+        sub.to_csv('submissions\\gru2.csv', index=False)
 
 
 if __name__ == "__main__":
 
-    train = pd.read_csv('C:\\Code\\Kaggle\\toxic-comments\\data\\train.csv').fillna(' ')
-    test = pd.read_csv('C:\\Code\\Kaggle\\toxic-comments\\data\\test.csv').fillna(' ')
+    train = pd.read_csv('data\\train.csv').fillna(' ')
+    test = pd.read_csv('data\\test.csv').fillna(' ')
 
     embed_size = 300
     max_features = 394787
@@ -89,7 +92,7 @@ if __name__ == "__main__":
     X_t = pad_sequences(list_tokenized_train, maxlen=maxlen)
     X_te = pad_sequences(list_tokenized_test, maxlen=maxlen)
 
-    pretrained = "C:\\Code\\Kaggle\\toxic-comments\\data\\crawl-300d-2M.vec"
+    pretrained = "data\\crawl-300d-2M.vec"
     print("Getting", pretrained)
     embeddings_index = get_pretrained(pretrained)
 
@@ -104,9 +107,24 @@ if __name__ == "__main__":
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None: embedding_matrix[i] = embedding_vector
 
-    net = GruNet(embed_size, max_features, maxlen, embedding_matrix)
-    net.fit(X_t, y)
-    # file_path="weights_base.best.hdf5"
-    # net.model.load_weights(file_path)
-    y_test = net.predict_proba(X_te)
-    net.submit()
+    oof = True
+
+    if oof:
+        fold = 0
+        train_idx, pred_idx = get_indices(fold)
+        net = GruNet(embed_size, max_features, maxlen, embedding_matrix)
+        net.fit(X_t[train_idx], y[train_idx])
+        y_oof = net.predict_proba(X_t[pred_idx])
+        
+        sub_oof = pd.read_csv('submissions\\gru_ft_oof_template.csv', encoding="utf-8")
+        for i in range(0,len(list_classes)):
+            sub_oof[list_classes[i]][pred_idx] = y_oof[:,i]
+        sub_oof.to_csv('gru_ft_oof_template.csv', index=False, encoding="utf-8")
+    
+    else:
+        net = GruNet(embed_size, max_features, maxlen, embedding_matrix)
+        net.fit(X_t, y)
+        # file_path="weights_base.best.hdf5"
+        # net.model.load_weights(file_path)
+        y_test = net.predict_proba(X_te)
+        net.submit()
