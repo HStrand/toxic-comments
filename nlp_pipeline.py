@@ -65,6 +65,29 @@ def rep_freq(x):
 def format_feature(series, func):
     return np.array(series.apply(func)).reshape(-1,1).astype(float)
 
+def has_ip(x):
+    ips_in_text = re.findall( r'[0-9]+(?:\.[0-9]+){3}', x)
+    has_ip = len(ips_in_text) > 0
+    return int(has_ip)
+
+def has_talk_tag(x):
+    return int("(talk" in x)
+
+def has_utc(x):
+    return int("(UTC)" in x)
+
+def link_count(x):
+    return x.count("http")
+
+def starts_with_i(x):
+    return int(x[:2] == "I ")
+
+def starts_with_you(x):
+    return x.lower().startswith("you")
+
+def about_image(x):
+    return int("Image:" in x)
+
 """
 Transforms
 """
@@ -383,7 +406,7 @@ if __name__ == "__main__":
 
     # Pipeline inputs
     class_labels = [column for column in train.columns[2:8]]
-    feature_funcs = [len, asterix_freq, uppercase_freq, line_change_freq, rep_freq, question_freq]
+    feature_funcs = [len, asterix_freq, uppercase_freq, line_change_freq, rep_freq, question_freq, has_ip, has_talk_tag, link_count, starts_with_i, starts_with_you, about_image]
     transforms = [tokenize]
     logreg = LogisticRegression(C=0.2, class_weight='balanced', solver='newton-cg', max_iter=10)
     logreg.name = "Logistic regression newton"

@@ -67,7 +67,7 @@ class GruNet():
     def submit(self):
         sub = pd.read_csv('data\\sample_submission.csv')
         sub[list_classes] = self.predictions
-        sub.to_csv('submissions\\gru2.csv', index=False)
+        sub.to_csv('submissions\\gru3.csv', index=False)
 
 
 if __name__ == "__main__":
@@ -107,10 +107,10 @@ if __name__ == "__main__":
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None: embedding_matrix[i] = embedding_vector
 
-    oof = True
+    oof = False
 
     if oof:
-        fold = 0
+        fold = 4
         train_idx, pred_idx = get_indices(fold)
         net = GruNet(embed_size, max_features, maxlen, embedding_matrix)
         net.fit(X_t[train_idx], y[train_idx])
@@ -119,7 +119,7 @@ if __name__ == "__main__":
         sub_oof = pd.read_csv('submissions\\gru_ft_oof_template.csv', encoding="utf-8")
         for i in range(0,len(list_classes)):
             sub_oof[list_classes[i]][pred_idx] = y_oof[:,i]
-        sub_oof.to_csv('gru_ft_oof_template.csv', index=False, encoding="utf-8")
+        sub_oof.to_csv('submissions\\gru_ft_oof_template.csv', index=False, encoding="utf-8")
     
     else:
         net = GruNet(embed_size, max_features, maxlen, embedding_matrix)
