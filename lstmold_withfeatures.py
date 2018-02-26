@@ -39,19 +39,13 @@ class LstmNet():
         input1 = Input(shape=(maxlen,))
         model1 = Embedding(max_features, embed_size, weights=[embedding_matrix], trainable=False)(input1)
         model1 = Bidirectional(LSTM(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(model1)
-        model1 = AttentionWeightedAverage()(model1)
         # model1 = GlobalMaxPool1D()(model1)
-        model1 = Bidirectional(LSTM(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(model1)
-        model1 = AttentionWeightedAverage()(model1)        
-        model1 = BatchNormalization()(model1)
-        model1 = Dense(300)(model1)
-        model1 = PReLU()(model1)
+        model1 = AttentionWeightedAverage()(model1)
+        model1 = Dense(300, activation="relu")(model1)
         model1 = Dropout(0.1)(model1)
 
         input2 = Input(shape=(num_features,))
-        model2 = BatchNormalization()(model2)
-        model2 = Dense(300)(input2)
-        model2 = PReLU()(model2)
+        model2 = Dense(300, activation="relu")(input2)
         model2 = Dropout(0.1)(model2)
 
         merged = Add()([model1, model2])
@@ -59,6 +53,7 @@ class LstmNet():
         merged = Dense(300)(merged)
         merged = PReLU()(merged)
         merged = Dropout(0.1)(merged)
+        # merged = Dropout(0.1)(merged)
         out = Dense(6, activation="sigmoid")(merged)
         self.model = Model(inputs=[input1, input2], outputs=out)
         self.model.compile(loss='binary_crossentropy', optimizer='Adam', metrics=['accuracy'])
@@ -128,8 +123,8 @@ if __name__ == "__main__":
         fold = 0
         train_idx, pred_idx = get_indices(fold)
         net = LstmNet(embed_size, max_features, maxlen, embedding_matrix)
-        net.fit(X_t[train_idx], y[train_idx])
-        y_oof = net.predict_proba(X_t[pred_idx])
+        net.fit(X_t[train_idx], y[train_idx], pipe.train_features[train_idx])
+        y_oof = net.predict_proba(X_t[pred_idx], pipe.train_features[pred_idx])
         
         sub_oof = pd.read_csv('submissions\\lstm_ft_oof_template.csv', encoding="utf-8")
         for i in range(0,len(list_classes)):
