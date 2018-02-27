@@ -2,14 +2,15 @@ import pandas as pd
 import numpy as np
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
-from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation
-from keras.layers import Bidirectional, GlobalMaxPool1D
+from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, PReLU, Add
+from keras.layers import Bidirectional, GlobalMaxPool1D, BatchNormalization, SpatialDropout1D
 from keras.models import Model
 from keras import initializers, regularizers, constraints, optimizers, layers, callbacks
 from keras.callbacks import LearningRateScheduler
 from sklearn.model_selection import KFold
 from sklearn.metrics import roc_auc_score
 from attlayer import AttentionWeightedAverage
+from nlp_pipeline import *
 
 N_DIMS = 300
 
@@ -34,35 +35,50 @@ def halve(epoch):
 
 class LstmNet():
     
-    def __init__(self, embed_size, max_features, maxlen, embedding_matrix):
-        inp = Input(shape=(maxlen,))
-        x = Embedding(max_features, embed_size, weights=[embedding_matrix])(inp)
-        x = Bidirectional(LSTM(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(x)
-        # x = GlobalMaxPool1D()(x)
-        x = AttentionWeightedAverage()(x)
-        x = Dense(300, activation="relu")(x)
-        x = Dropout(0.1)(x)
-        x = Dense(6, activation="sigmoid")(x)
-        self.model = Model(inputs=inp, outputs=x)
-        # optimizer = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0, amsgrad=False)
+    def __init__(self, embed_size, max_features, maxlen, embedding_matrix, num_features):
+        input1 = Input(shape=(maxlen,))
+        model1 = Embedding(max_features, embed_size, weights=[embedding_matrix], trainable=False)(input1)
+        model1 = Bidirectional(LSTM(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(model1)
+        model1 = AttentionWeightedAverage()(model1)
+        # model1 = GlobalMaxPool1D()(model1)
+        model1 = Bidirectional(LSTM(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(model1)
+        model1 = AttentionWeightedAverage()(model1)        
+        model1 = BatchNormalization()(model1)
+        model1 = Dense(300)(model1)
+        model1 = PReLU()(model1)
+        model1 = Dropout(0.1)(model1)
+
+        input2 = Input(shape=(num_features,))
+        model2 = BatchNormalization()(model2)
+        model2 = Dense(300)(input2)
+        model2 = PReLU()(model2)
+        model2 = Dropout(0.1)(model2)
+
+        merged = Add()([model1, model2])
+        merged = BatchNormalization()(merged)
+        merged = Dense(300)(merged)
+        merged = PReLU()(merged)
+        merged = Dropout(0.1)(merged)
+        out = Dense(6, activation="sigmoid")(merged)
+        self.model = Model(inputs=[input1, input2], outputs=out)
         self.model.compile(loss='binary_crossentropy', optimizer='Adam', metrics=['accuracy'])
     
-    def fit(self, train_features, train_labels):
+    def fit(self, train_features, train_labels, features):
         # early = callbacks.EarlyStopping(monitor='val_loss', min_delta=0.001, patience=0, verbose=0, mode='auto')
         # file_path="weights_base.best.hdf5"
         # checkpoint = callbacks.ModelCheckpoint(file_path, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
         # lrate = LearningRateScheduler(halve)
-        self.model.fit(train_features, train_labels, batch_size=32, epochs=2, validation_split=0.1)
+        self.model.fit([train_features, features], y=train_labels, batch_size=32, epochs=5, validation_split=0.1, shuffle=True)
         # self.model.fit(train_features, train_labels, batch_size=32, epochs=2)
 
-    def predict_proba(self, features):
-        self.predictions = self.model.predict([features], batch_size=1024, verbose=1)
+    def predict_proba(self, X, features):
+        self.predictions = self.model.predict([X, features], batch_size=1024, verbose=1)
         return self.predictions
 
     def submit(self):
         sub = pd.read_csv('data\\sample_submission.csv')
         sub[list_classes] = self.predictions
-        sub.to_csv('submissions\\lstm8.csv', index=False)
+        sub.to_csv('submissions\\lstm15.csv', index=False)
 
 if __name__ == "__main__":
 
@@ -71,7 +87,8 @@ if __name__ == "__main__":
 
     embed_size = 300
     max_features = 394787
-    maxlen = 200
+    maxlen = 500
+    num_features = 12
 
     list_sentences_train = train["comment_text"].values
     list_classes = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
@@ -99,9 +116,13 @@ if __name__ == "__main__":
     for word, i in word_index.items():
         if i >= max_features: continue
         embedding_vector = embeddings_index.get(word)
-        if embedding_vector is not None: embedding_matrix[i] = embedding_vector    
+        if embedding_vector is not None: embedding_matrix[i] = embedding_vector
 
-    oof = True
+    feature_funcs = [len, asterix_freq, uppercase_freq, line_change_freq, rep_freq, question_freq, has_ip, has_talk_tag, link_count, starts_with_i, starts_with_you, about_image]
+    pipe = NlpPipeline(train, test, "comment_text", list_classes, feature_funcs, transforms=[], models=[], word_index=word_index, pretrained=pretrained)
+    pipe.engineer_features()
+    
+    oof = False
 
     if oof:
         fold = 0
@@ -116,9 +137,9 @@ if __name__ == "__main__":
         sub_oof.to_csv('lstm_ft_oof_template.csv', index=False, encoding="utf-8")
     
     else:
-        net = LstmNet(embed_size, max_features, maxlen, embedding_matrix)
-        net.fit(X_t, y)
+        net = LstmNet(embed_size, max_features, maxlen, embedding_matrix, num_features)
+        net.fit(X_t, y, pipe.train_features)
         # file_path="weights_base.best.hdf5"
         # net.model.load_weights(file_path)
-        y_test = net.predict_proba(X_te)
+        y_test = net.predict_proba(X_te, pipe.test_features)
         net.submit()
