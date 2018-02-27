@@ -30,29 +30,33 @@ def get_indices(fold):
     return train_idx, pred_idx  
 
 def halve(epoch):
-    lr = 0.002
-    return lr/(2**epoch)
+    base = 0.002
+    return base/(2**epoch)
+
+def decay07(epoch):
+    base = 0.001
+    return base*(0.7**epoch)
 
 class LstmNet():
     
     def __init__(self, embed_size, max_features, maxlen, embedding_matrix, num_features):
         input1 = Input(shape=(maxlen,))
         model1 = Embedding(max_features, embed_size, weights=[embedding_matrix], trainable=False)(input1)
-        model1 = Bidirectional(LSTM(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(model1)
+        model1 = Bidirectional(LSTM(300, return_sequences=True))(model1)
         model1 = AttentionWeightedAverage()(model1)
         # model1 = GlobalMaxPool1D()(model1)
         model1 = Dense(300, activation="relu")(model1)
-        model1 = Dropout(0.1)(model1)
+        model1 = Dropout(0.5)(model1)
         out = Dense(6, activation="sigmoid")(model1)
         self.model = Model(inputs=input1, outputs=out)
-        self.model.compile(loss='binary_crossentropy', optimizer='Adam', metrics=['accuracy'])
+        self.model.compile(loss='binary_crossentropy', optimizer='Nadam', metrics=['accuracy'])
     
     def fit(self, train_features, train_labels):
         # early = callbacks.EarlyStopping(monitor='val_loss', min_delta=0.001, patience=0, verbose=0, mode='auto')
         # file_path="weights_base.best.hdf5"
         # checkpoint = callbacks.ModelCheckpoint(file_path, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
-        # lrate = LearningRateScheduler(halve)
-        self.model.fit(train_features, y=train_labels, batch_size=32, epochs=5, validation_split=0.1, shuffle=True)
+        lrate = LearningRateScheduler(decay07)
+        self.model.fit(train_features, y=train_labels, batch_size=32, epochs=3, validation_split=0.1, shuffle=True, callbacks=[lrate])
         # self.model.fit(train_features, train_labels, batch_size=32, epochs=2)
 
     def predict_proba(self, X):
@@ -62,7 +66,7 @@ class LstmNet():
     def submit(self):
         sub = pd.read_csv('data\\sample_submission.csv')
         sub[list_classes] = self.predictions
-        sub.to_csv('submissions\\lstm16.csv', index=False)
+        sub.to_csv('submissions\\lstm17.csv', index=False)
 
 if __name__ == "__main__":
 
