@@ -1,0 +1,27 @@
+embed_size = 300
+max_features = 394787
+maxlen = 500
+num_features = 12
+
+
+input1 = Input(shape=(maxlen,))
+model1 = Embedding(max_features, embed_size, weights=[embedding_matrix], trainable=False)(input1)
+model1 = Bidirectional(LSTM(300, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))(model1)
+# model1 = GlobalMaxPool1D()(model1)
+model1 = AttentionWeightedAverage()(model1)
+model1 = Dense(300, activation="relu")(model1)
+model1 = Dropout(0.1)(model1)
+
+input2 = Input(shape=(num_features,))
+model2 = Dense(300, activation="relu")(input2)
+model2 = Dropout(0.1)(model2)
+
+merged = Add()([model1, model2])
+merged = BatchNormalization()(merged)
+merged = Dense(300)(merged)
+merged = PReLU()(merged)
+merged = Dropout(0.1)(merged)
+# merged = Dropout(0.1)(merged)
+out = Dense(6, activation="sigmoid")(merged)
+self.model = Model(inputs=[input1, input2], outputs=out)
+self.model.compile(loss='binary_crossentropy', optimizer='Adam', metrics=['accuracy'])

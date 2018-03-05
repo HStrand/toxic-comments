@@ -16,15 +16,14 @@ import lightgbm as lgb
 """
 Pretrained model
 """
-N_DIMS = 300
 
-def get_average_wordvector(tokens_list, vector, generate_missing=False, k=N_DIMS):
+def get_average_wordvector(tokens_list, vector, generate_missing=False, dim=300):
     if len(tokens_list)<1:
-        return np.zeros(k)
+        return np.zeros(dim)
     if generate_missing:
-        vectorized = [vector[word] if word in vector else np.random.rand(k) for word in tokens_list]
+        vectorized = [vector[word] if word in vector else np.random.rand(dim) for word in tokens_list]
     else:
-        vectorized = [vector[word] if word in vector else np.zeros(k) for word in tokens_list]
+        vectorized = [vector[word] if word in vector else np.zeros(dim) for word in tokens_list]
     length = len(vectorized)
     summed = np.sum(vectorized, axis=0)
     averaged = np.divide(summed, length)
@@ -34,10 +33,9 @@ def get_embeddings(vectors, clean_comments, generate_missing=False):
     embeddings = clean_comments.apply(lambda x: get_average_wordvector(x, vectors, generate_missing=generate_missing))
     return list(embeddings)
 
-def get_coefs(row):
+def get_coefs(row, dim=300):
     row = row.strip().split()
-    # can't use row[0], row[1:] split because 840B contains multi-part words 
-    word, arr = " ".join(row[:-N_DIMS]), row[-N_DIMS:]
+    word, arr = " ".join(row[:-dim]), row[-dim:]
     return word, np.asarray(arr, dtype='float32')
 
 def get_pretrained(text_file):
@@ -46,6 +44,8 @@ def get_pretrained(text_file):
 """
 Feature engineering
 """
+def format_feature(series, func):
+    return np.array(series.apply(func)).reshape(-1,1).astype(float)
 
 def asterix_freq(x):
     return x.count('!')/len(x)
@@ -61,9 +61,6 @@ def line_change_freq(x):
 
 def rep_freq(x):
     return np.sum([x[i]==x[i+1]==x[i+2] for i in range(0,len(x)-2)])/len(x) 
-
-def format_feature(series, func):
-    return np.array(series.apply(func)).reshape(-1,1).astype(float)
 
 def has_ip(x):
     ips_in_text = re.findall( r'[0-9]+(?:\.[0-9]+){3}', x)
